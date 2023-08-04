@@ -13,9 +13,10 @@ async function fetchEarthquakeData() {
 
 // Function to create the Leaflet map
 function createMap() {
-  const map = L.map('map').setView([0, 0], 2);
+  const map = L.map('map').setView([37.0902, -95.7129], 4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
   return map;
+ 
 }
 
 // Function to create earthquake markers and popups
@@ -49,13 +50,29 @@ function createMarkersAndPopups(earthquakeData, map) {
 // Function to set color based on magnitude
 function getColor(mag) {
   switch (true) {
-    case (mag < 2.5): return "#0071BC";
-    case (mag < 4.0): return "#35BC00";
-    case (mag < 5.5): return "#BCBC00";
-    case (mag < 8.0): return "#BC3500";
-    default: return "#BC0000";
+    case (1 <= mag < 2.5): return "#90EE90";
+    case (2.5 <= mag < 4.0): return "#35BC00";
+    case (4 <= mag < 5.5): return "#BCBC00";
+    case (5.5 <= mag < 8): return "#BC3500";
+	case (mag >= 8.0): return "#BC0000";
+    default: return "#E2FFAE";
   }
 }
+let legend = L.control({position: 'bottomright'});
+
+legend.onAdd = function (map) {
+    let div = L.DomUtil.create('div', 'info legend'),
+        grades = [1.0, 2.5, 4.0, 5.5, 8.0],
+        labels = [];
+
+    // loop through density intervals
+    for (let i = 0; i < grades.length; i++) {
+        div.innerHTML +=
+            '<i style="background:' + chooseColor(grades[i] + 1) + '"></i> ' +
+            grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
+    }
+    return div;
+};
 
 // Fetch the earthquake data and create the map when the DOM is ready
 document.addEventListener('DOMContentLoaded', async () => {
@@ -63,3 +80,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   const map = createMap();
   createMarkersAndPopups(earthquakeData, map);
 });
+
+ 
