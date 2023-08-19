@@ -1,84 +1,89 @@
-// Function to fetch earthquake data from the GeoJSON feed
-async function fetchEarthquakeData() {
-  const link = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson";
-  try {
-    const response = await fetch(link);
-    const data = await response.json();
-    return data.features;
-  } catch (error) {
-    console.error('Error fetching data:', error);
-    return [];
-  }
-}
-
-// Function to create the Leaflet map
-function createMap() {
-  const map = L.map('map').setView([37.0902, -95.7129], 4);
+// Create the Leaflet map
+  var map = L.map('map').setView([37.0902, -95.7129], 4);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-  return map;
- 
-}
 
-// Function to create earthquake markers and popups
-function createMarkersAndPopups(earthquakeData, map) {
-  for (const earthquake of earthquakeData) {
-    const { geometry, properties } = earthquake;
-    const lat = geometry.coordinates[1];
-    const lon = geometry.coordinates[0];
-    const mag = properties.mag;
-    const depth = geometry.coordinates[2];
-    const place = properties.place;
-    const time = new Date(properties.time).toLocaleString();
+// Add a tile layer for the map background 
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-    const markerOptions = {
-      radius: mag * 5,
-      fillColor: getColor(mag),
-      color: getColor(mag),
-      weight: 1,
-      opacity: 0.8,
-      fillOpacity: 0.35
+// Fetch the GeoJSON data
+var geoDataUrl = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_month.geojson'; 
+
+fetch(geoDataUrl)
+  .then(response => response.json())
+  .then(data => {
+    // Function to get color based on earthquake depth
+    function getColor(depth) {
+      var colorScale = [
+        '#00FF00', // Green
+        '#ADFF2F', // Yellow-Green
+        '#FFFF00', // Yellow
+        '#FFA500', // Orange
+        '#FF4500', // Red-Orange
+        '#FF0000' // Red
+      ];
+
+      if (depth <= 10) return colorScale[0];
+      if (depth <= 30) return colorScale[1];
+      if (depth <= 50) return colorScale[2];
+      if (depth <= 70) return colorScale[3];
+      if (depth <= 90) return colorScale[4];
+      return colorScale[5];
+    }
+
+    // Create a GeoJSON layer and add it to the map
+    L.geoJSON(data, {
+      pointToLayer: function (feature, latlng) {
+        // Calculate marker size based on magnitude
+        var magnitude = feature.properties.mag;
+        var markerSize = magnitude * 3; 
+
+        // Calculate marker color based on depth
+        var depth = feature.geometry.coordinates[2]; 
+        var markerColor = getColor(depth);
+
+        return L.circleMarker(latlng, {
+          radius: markerSize,
+          fillColor: markerColor,
+          color: '#000',
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        });
+      },
+      onEachFeature: function (feature, layer) {
+        // Add a popup with information
+        layer.bindPopup(
+          `<strong>Magnitude:</strong> ${feature.properties.mag}<br><strong>Location:</strong> ${feature.properties.place}<br><strong>Depth:</strong> ${feature.geometry.coordinates[2]} km`
+        );
+      }
+    }).addTo(map);
+
+    // Create legend
+    var legend = L.control({ position: 'bottomright' });
+
+    legend.onAdd = function (map) {
+      var div = L.DomUtil.create('div', 'info legend');
+      var depths = [-10, 10, 30, 50, 70, 90]; 
+      var labels = [],
+        from, to;
+
+      for (var i = 0; i < depths.length; i++) {
+        from = depths[i];
+        to = depths[i + 1];
+
+        var colorBox = `<div style="width: 20px; height: 10px; background:${getColor(from + 1)}; display: inline-block;"></div>`;
+        var depthLabel = `${from}${to ? '&ndash;' + to : '+'} km`;
+
+        labels.push(
+          `<div>${colorBox} ${depthLabel}</div>`
+        );
+      }
+
+      div.innerHTML = `<div style="background: white; padding: 10px;">${labels.join('')}</div>`;
+
+      return div;
     };
 
-    const marker = L.circleMarker([lat, lon], markerOptions)
-      .bindPopup(
-        `<h3>Where: ${place}</h3><hr><p>${time}</p><br><h2>Magnitude: ${mag}</h2><br>Depth: ${depth} km`
-      )
-      .addTo(map);
-  }
-}
-
-// Function to set color based on magnitude
-function getColor(mag) {
-  switch (true) {
-    case (1 <= mag < 2.5): return "#90EE90";
-    case (2.5 <= mag < 4.0): return "#35BC00";
-    case (4 <= mag < 5.5): return "#BCBC00";
-    case (5.5 <= mag < 8): return "#BC3500";
-	case (mag >= 8.0): return "#BC0000";
-    default: return "#E2FFAE";
-  }
-}
-let legend = L.control({position: 'bottomright'});
-
-legend.onAdd = function (map) {
-    let div = L.DomUtil.create('div', 'info legend'),
-        grades = [1.0, 2.5, 4.0, 5.5, 8.0],
-        labels = [];
-
-    // loop through density intervals
-    for (let i = 0; i < grades.length; i++) {
-        div.innerHTML +=
-            '<i style="background:' + chooseColor(grades[i] + 1) + '"></i> ' +
-            grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
-    }
-    return div;
-};
-
-// Fetch the earthquake data and create the map when the DOM is ready
-document.addEventListener('DOMContentLoaded', async () => {
-  const earthquakeData = await fetchEarthquakeData();
-  const map = createMap();
-  createMarkersAndPopups(earthquakeData, map);
-});
-
- 
+    // Add legend to the map
+    legend.addTo(map);
+  });
